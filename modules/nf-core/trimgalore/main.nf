@@ -1,6 +1,7 @@
 process TRIMGALORE {
     tag "${meta.id}"
     label 'process_high'
+    resourceLimits [cpus: 15]
 
     conda "${moduleDir}/environment.yml"
     container "${workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container
@@ -26,17 +27,20 @@ process TRIMGALORE {
     // Calculate number of --cores for TrimGalore based on value of task.cpus
     // See: https://github.com/FelixKrueger/TrimGalore/blob/master/CHANGELOG.md#version-060-release-on-1-mar-2019
     // See: https://github.com/nf-core/atacseq/pull/65
+    // Each --cores N uses: N(read) + N(write) + N(Cutadapt) + 2(extra Cutadapt) + 1(TrimGalore)
+    // E.g., --cores 2 uses up to 9 cores, --cores 4 uses up to 15 cores
     def cores = 1
+    // Calculate max cores that won't exceed available CPUs
     if (task.cpus) {
-        cores = (task.cpus as int) - 4
-        if (meta.single_end) {
-            cores = (task.cpus as int) - 3
+        // Divide by ~4 since each core specified multiplies
+        cores = (task.cpus as int) / 4
+        // Cap at 4 cores due to diminishing returns
+        if (cores > 4) {
+            cores = 4
         }
+        // Ensure at least 1 core
         if (cores < 1) {
             cores = 1
-        }
-        if (cores > 8) {
-            cores = 8
         }
     }
 
