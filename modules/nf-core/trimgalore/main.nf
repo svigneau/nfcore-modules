@@ -28,20 +28,20 @@ process TRIMGALORE {
     // Calculate number of --cores for TrimGalore based on value of task.cpus
     // See: https://github.com/FelixKrueger/TrimGalore/blob/master/CHANGELOG.md#version-060-release-on-1-mar-2019
     // See: https://github.com/nf-core/atacseq/pull/65
-    // Each --cores N uses: N(read) + N(write) + N(Cutadapt) + 2(extra Cutadapt) + 1(TrimGalore)
-    // E.g., --cores 2 uses up to 9 cores, --cores 4 uses up to 15 cores
+    // Each --cores N requires:
+    // Single-end: 3 base cores + N cutadapt cores
+    // Paired-end: 4 base cores + N cutadapt cores
     def cores = 1
-    // Calculate max cores that won't exceed available CPUs
     if (task.cpus) {
-        // Divide by ~4 since each core specified multiplies
-        cores = (task.cpus as int) / 4
-        // Cap at 4 cores due to diminishing returns
+        // Calculate available cores for cutadapt after accounting for base usage
+        def available = (task.cpus as int) - (meta.single_end ? 3 : 4)
+        if (available > 0) {
+            cores = available
+        }
+        // Cap at 4 cores due to diminishing returns (confirmed by @FelixKrueger)
+        // NOTE: https://github.com/nf-core/atacseq/pull/65#issuecomment-558163045
         if (cores > 4) {
             cores = 4
-        }
-        // Ensure at least 1 core
-        if (cores < 1) {
-            cores = 1
         }
     }
 
